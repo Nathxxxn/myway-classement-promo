@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "MyWay - Classement Promo",
+  "version": "1.0",
+  "description": "Affiche le classement promo sur MyWay CentraleSupélec. Développé par Nathan Di Fraja.",
+  "permissions": ["scripting"],
+  "host_permissions": [
+    "https://myway.centralesupelec.fr/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://myway.centralesupelec.fr/curriculum*"],
+      "js": ["content.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "action": {
+    "default_title": "MyWay - Classement Promo",
+    "default_popup": "popup.html"
+  },
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon16.png",
+    "128": "icon16.png"
+  }
+}

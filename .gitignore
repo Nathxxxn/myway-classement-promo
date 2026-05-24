@@ -1,0 +1,11 @@
+.DS_Store
+node_modules/
+coverage/
+
+# Local snapshots may contain personal MyWay data.
+pag-snapshot.html
+*-snapshot.html
+
+# Agent/internal planning artifacts.
+.superpowers/
+docs/superpowers/
