@@ -44,6 +44,33 @@ function createElement(tagName) {
   };
 }
 
+function createTreeWalker(root) {
+  const textNodes = [];
+
+  function collectTextNodes(element) {
+    if (!element) return;
+
+    if (element.textContent) {
+      textNodes.push({
+        nodeValue: element.textContent,
+        parentElement: element
+      });
+    }
+
+    for (const child of element.children || []) {
+      collectTextNodes(child);
+    }
+  }
+
+  collectTextNodes(root);
+
+  return {
+    nextNode() {
+      return textNodes.shift() ?? null;
+    }
+  };
+}
+
 function loadContentScript() {
   const context = {
     console: { log() {}, warn() {}, error() {} },
@@ -53,6 +80,7 @@ function loadContentScript() {
     },
     clearTimeout() {},
     Node: { ELEMENT_NODE: 1 },
+    NodeFilter: { SHOW_TEXT: 4 },
     MutationObserver: class {
       observe() {}
     },
@@ -60,6 +88,7 @@ function loadContentScript() {
       body: createElement('body'),
       head: createElement('head'),
       createElement,
+      createTreeWalker,
       querySelector() {
         return null;
       },
@@ -125,26 +154,23 @@ test('syncBadgeWidthWithGraph copies the visible graph width onto the badge', ()
 });
 
 test('injected badge styles use a white background', () => {
-  const context = loadContentScript();
-  const style = context.document.head.children[0];
+  const css = fs.readFileSync('content.css', 'utf8');
 
-  assert.match(style.textContent, /background:\s*#fff;/);
-  assert.doesNotMatch(style.textContent, /background:\s*#fbfaf7;/);
+  assert.match(css, /background:\s*#fff;/);
+  assert.doesNotMatch(css, /background:\s*#fbfaf7;/);
 });
 
 test('general rank panel fills its aligned curriculum column', () => {
-  const context = loadContentScript();
-  const style = context.document.head.children[0];
+  const css = fs.readFileSync('content.css', 'utf8');
 
-  assert.match(style.textContent, /\.mw-general-rank-panel\s*{[^}]*width:\s*100%;/s);
-  assert.doesNotMatch(style.textContent, /\.mw-general-rank-panel\s*{[^}]*width:\s*min\(100%,\s*560px\);/s);
+  assert.match(css, /\.mw-general-rank-panel\s*{[^}]*width:\s*100%;/s);
+  assert.doesNotMatch(css, /\.mw-general-rank-panel\s*{[^}]*width:\s*min\(100%,\s*560px\);/s);
 });
 
-test('course rank inline badge styles are not injected', () => {
-  const context = loadContentScript();
-  const style = context.document.head.children[0];
+test('course rank inline badge styles are absent from the stylesheet', () => {
+  const css = fs.readFileSync('content.css', 'utf8');
 
-  assert.doesNotMatch(style.textContent, /mw-course-rank-pill/);
+  assert.doesNotMatch(css, /mw-course-rank-pill/);
 });
 
 test('findYearHeaderElement matches a visible academic year inside a decorated header', () => {
@@ -158,10 +184,8 @@ test('findYearHeaderElement matches a visible academic year inside a decorated h
   wideContainer.getBoundingClientRect = () => ({ width: 600, height: 80, left: 0 });
   decoratedHeader.getBoundingClientRect = () => ({ width: 260, height: 32, left: 0 });
 
-  context.document.querySelectorAll = (selector) => {
-    assert.equal(selector, 'body *');
-    return [wideContainer, decoratedHeader];
-  };
+  context.document.body.appendChild(wideContainer);
+  context.document.body.appendChild(decoratedHeader);
 
   assert.equal(context.findYearHeaderElement('2025-2026'), decoratedHeader);
 });
@@ -199,11 +223,8 @@ test('injectGeneralRankBadges ignores concurrent general injections while the fi
   header.textContent = '2025-2026';
   header.getBoundingClientRect = () => ({ width: 220, height: 32, left: 0 });
 
+  context.document.body.appendChild(header);
   context.document.querySelector = () => null;
-  context.document.querySelectorAll = (selector) => {
-    if (selector === 'body *') return [header];
-    return [];
-  };
 
   let fetchCalls = 0;
   context.fetch = () => {
@@ -211,8 +232,8 @@ test('injectGeneralRankBadges ignores concurrent general injections while the fi
     return new Promise(() => {});
   };
 
-  context.injectGeneralRankBadges();
-  context.injectGeneralRankBadges();
+  void context.injectGeneralRankBadges();
+  void context.injectGeneralRankBadges();
 
   assert.equal(fetchCalls, 1);
 });
@@ -224,20 +245,16 @@ test('injectGeneralRankBadges does not warn while the page is still rendering th
   context.console.warn = (...args) => warnings.push(args.join(' '));
   context.document.readyState = 'loading';
   context.document.querySelector = () => null;
-  context.document.querySelectorAll = (selector) => {
-    if (selector === 'body *') return [];
-    return [];
-  };
 
   await context.injectGeneralRankBadges();
 
   assert.deepEqual(warnings, []);
 });
 
-test('computeDistributionStats returns average median min and max', () => {
+test('computeRankDetails returns average median min and max', () => {
   const context = loadContentScript();
 
-  assert.deepEqual(JSON.parse(JSON.stringify(context.computeDistributionStats(['12', '16,5', 10, 'PASS', 18]))), {
+  assert.deepEqual(JSON.parse(JSON.stringify(context.computeRankDetails(16.5, ['12', '16,5', 10, 'PASS', 18]).stats)), {
     average: 14.125,
     median: 14.25,
     min: 10,

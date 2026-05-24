@@ -5,36 +5,14 @@
  *
  * Ce script s'injecte sur la page MyWay et ajoute :
  * 1. Le classement dans la promo à côté du graphique de distribution existant, par cours.
- * 2. Le classement par moyenne générale annuelle sous le bloc 2025-2026.
+ * 2. Le classement par moyenne générale annuelle sous le bloc de l'année.
  */
 
+const CURRENT_ACADEMIC_YEAR = '2025-2026';
 
 // ——————————————————————————————————————————
 // Utilitaires
 // ——————————————————————————————————————————
-
-function normalizeText(value) {
-    return String(value ?? '')
-        .replace(/\s+/g, ' ')
-        .trim();
-}
-
-function textMatchesAcademicYear(text, academicYear) {
-    const normalizedText = normalizeText(text);
-    const normalizedYear = normalizeText(academicYear);
-    const yearParts = normalizedYear.match(/^(\d{4})\s*[-–—]\s*(\d{4})$/);
-
-    if (!yearParts) {
-        return normalizedText === normalizedYear;
-    }
-
-    const [, startYear, endYear] = yearParts;
-    const academicYearPattern = new RegExp(
-        `(^|\\D)${startYear}\\s*[-–—]\\s*${endYear}(\\D|$)`
-    );
-
-    return academicYearPattern.test(normalizedText);
-}
 
 /**
  * Convertit une note MyWay en nombre.
@@ -56,57 +34,48 @@ function parseMyWayMark(value) {
 }
 
 /**
- * Calcule le classement de l'étudiant dans la promo.
+ * Calcule le classement de l'étudiant et les stats de la promo en un seul passage.
  */
-function computeRank(userGrade, allGrades) {
-    const numericGrades = (allGrades ?? [])
-        .map(parseMyWayMark)
-        .filter(Number.isFinite);
+function computeRankDetails(userGrade, allGrades) {
+    const numericGrades = [];
+    let sum = 0;
 
-    const total = numericGrades.length;
-
-    if (!Number.isFinite(userGrade) || total === 0) {
-        return null;
+    // Un seul parsing
+    for (const grade of (allGrades || [])) {
+        const parsed = parseMyWayMark(grade);
+        if (Number.isFinite(parsed)) {
+            numericGrades.push(parsed);
+            sum += parsed;
+        }
     }
 
-    const better = numericGrades.filter(g => g > userGrade).length;
+    const total = numericGrades.length;
+    if (!Number.isFinite(userGrade) || total === 0) return null;
+
+    let better = 0;
+    for (const g of numericGrades) {
+        if (g > userGrade) better++;
+    }
+
     const rank = better + 1;
     const percentile = Math.round(((total - better) / total) * 100);
 
-    return { rank, total, percentile };
-}
-
-function computeDistributionStats(allGrades) {
-    const numericGrades = (allGrades ?? [])
-        .map(parseMyWayMark)
-        .filter(Number.isFinite)
-        .sort((a, b) => a - b);
-
-    const total = numericGrades.length;
-
-    if (!total) return null;
-
+    // Tri uniquement requis pour la médiane et le min/max
+    numericGrades.sort((a, b) => a - b);
     const middle = Math.floor(total / 2);
     const median = total % 2
         ? numericGrades[middle]
         : (numericGrades[middle - 1] + numericGrades[middle]) / 2;
-    const average = numericGrades.reduce((sum, grade) => sum + grade, 0) / total;
 
     return {
-        average,
-        median,
-        min: numericGrades[0],
-        max: numericGrades[total - 1]
+        rank, total, percentile,
+        stats: {
+            average: sum / total,
+            median,
+            min: numericGrades[0],
+            max: numericGrades[total - 1]
+        }
     };
-}
-
-function computeRankDetails(userGrade, allGrades) {
-    const rankInfo = computeRank(userGrade, allGrades);
-    const stats = computeDistributionStats(allGrades);
-
-    if (!rankInfo || !stats) return null;
-
-    return { ...rankInfo, stats };
 }
 
 function formatStat(value) {
@@ -173,7 +142,7 @@ function fetchGradesCached() {
 // Détection dynamique des sessions générales
 // ——————————————————————————————————————————
 
-function findAcademicYearRoot(gradesData, academicYear = '2025-2026') {
+function findAcademicYearRoot(gradesData, academicYear = CURRENT_ACADEMIC_YEAR) {
     const roots = Array.isArray(gradesData) ? gradesData : [gradesData];
 
     return roots.find(node =>
@@ -186,7 +155,7 @@ function findAcademicYearRoot(gradesData, academicYear = '2025-2026') {
     ) ?? null;
 }
 
-function getGeneralSessionsFromGrades(gradesData, academicYear = '2025-2026') {
+function getGeneralSessionsFromGrades(gradesData, academicYear = CURRENT_ACADEMIC_YEAR) {
     const yearRoot = findAcademicYearRoot(gradesData, academicYear);
 
     if (!yearRoot) {
@@ -278,7 +247,7 @@ function writeCachedGeneralRank(academicYear, rankItems) {
     }
 }
 
-async function getGeneralRankData(academicYear = '2025-2026') {
+async function getGeneralRankData(academicYear = CURRENT_ACADEMIC_YEAR) {
     const gradesData = await fetchGradesCached();
     const sessions = getGeneralSessionsFromGrades(gradesData, academicYear);
 
@@ -326,10 +295,6 @@ async function getGeneralRankData(academicYear = '2025-2026') {
     if (rankItems.length) writeCachedGeneralRank(academicYear, rankItems);
 
     return rankItems;
-}
-
-function prefetchGeneralRankData(academicYear = '2025-2026') {
-    return getGeneralRankData(academicYear).catch(() => null);
 }
 
 
@@ -430,7 +395,7 @@ function injectRankInModal(rankInfo) {
 
 
 // ——————————————————————————————————————————
-// Bloc général sous 2025-2026
+// Bloc général sous l'année
 // ——————————————————————————————————————————
 
 function isVisibleElement(el) {
@@ -448,20 +413,29 @@ function isVisibleElement(el) {
 }
 
 /**
- * Trouve le plus petit élément visible qui référence l'année académique.
+ * Trouve le plus petit élément visible qui référence l'année académique via un TreeWalker.
  */
-function findYearHeaderElement(yearLabel = '2025-2026') {
-    const all = Array.from(document.querySelectorAll('body *'));
+function findYearHeaderElement(yearLabel = CURRENT_ACADEMIC_YEAR) {
+    const [startYear, endYear] = yearLabel.split(/\s*[-–—]\s*/);
+    const pattern = new RegExp(`${startYear}\\s*[-–—]\\s*${endYear}`);
+    
+    // Le TreeWalker ne parcourt QUE les nœuds de texte
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
+    let node;
+    const candidates = [];
+    
+    while ((node = walker.nextNode())) {
+        if (pattern.test(node.nodeValue) && node.parentElement) {
+            candidates.push(node.parentElement);
+        }
+    }
 
-    return all
+    return candidates
         .filter(isVisibleElement)
-        .filter(el => textMatchesAcademicYear(el.textContent, yearLabel))
         .sort((a, b) => {
             const aRect = a.getBoundingClientRect();
             const bRect = b.getBoundingClientRect();
-            const aArea = aRect.width * aRect.height;
-            const bArea = bRect.width * bRect.height;
-            return aArea - bArea;
+            return (aRect.width * aRect.height) - (bRect.width * bRect.height);
         })[0] ?? null;
 }
 
@@ -570,7 +544,7 @@ async function injectGeneralRankBadges() {
     generalRankInjectionInProgress = true;
 
     try {
-        const yearLabel = '2025-2026';
+        const yearLabel = CURRENT_ACADEMIC_YEAR;
         const yearHeader = findYearHeaderElement(yearLabel);
 
         if (!yearHeader) {
@@ -697,6 +671,8 @@ const domObserver = new MutationObserver((mutations) => {
     let shouldTryInjectModal = false;
     let shouldTryInjectGeneral = false;
 
+    const startYearText = CURRENT_ACADEMIC_YEAR.split('-')[0];
+
     for (const mutation of mutations) {
         for (const node of mutation.addedNodes) {
             if (node.nodeType !== Node.ELEMENT_NODE) continue;
@@ -709,8 +685,8 @@ const domObserver = new MutationObserver((mutations) => {
                 shouldTryInjectModal = true;
             }
 
-            const text = normalizeText(node.textContent);
-            const mightContainYear = text.includes('2025-2026');
+            // Vérification allégée sans parsing lourd Regex
+            const mightContainYear = node.textContent && node.textContent.includes(startYearText);
 
             if (mightContainYear) {
                 shouldTryInjectGeneral = true;
@@ -747,275 +723,20 @@ function startDomObserver() {
 
 startDomObserver();
 
-
-// ——————————————————————————————————————————
-// Styles CSS injectés
-// ——————————————————————————————————————————
-
-const style = document.createElement('style');
-
-style.textContent = `
-  /* Badge de classement dans la modal */
-  .mw-rank-badge {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 14px;
-    box-sizing: border-box;
-    width: 100%;
-    background: #fff;
-    border: 1px solid #1f2326;
-    border-radius: 8px;
-    padding: 14px 16px;
-    margin: 12px 0 14px;
-    box-shadow: 0 14px 34px rgba(23, 23, 23, 0.10);
-    font-size: 14px;
-    color: #202020;
-  }
-
-  .mw-rank-badge .mw-rank-accent {
-    width: 4px;
-    height: 42px;
-    border-radius: 999px;
-    background: #9a1f28;
-  }
-
-  .mw-rank-badge .mw-rank-main {
-    display: grid;
-    gap: 4px;
-    min-width: 0;
-  }
-
-  .mw-rank-badge .mw-rank-label {
-    color: #73706a;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    line-height: 1;
-    text-transform: uppercase;
-  }
-
-  .mw-rank-badge .mw-rank-line {
-    display: flex;
-    align-items: baseline;
-    gap: 5px;
-    min-width: 0;
-  }
-
-  .mw-rank-badge .mw-rank-value {
-    color: #202020;
-    font-size: 20px;
-    font-weight: 700;
-    line-height: 1.1;
-  }
-
-  .mw-rank-badge .mw-rank-total {
-    color: #858079;
-    font-size: 18px;
-    font-weight: 500;
-    line-height: 1.1;
-  }
-
-  .mw-rank-badge .mw-rank-percentile {
-    justify-self: end;
-    color: #9a1f28;
-    background: #fff;
-    border: 1px solid #d9d5cc;
-    border-radius: 999px;
-    padding: 6px 10px;
-    font-size: 12px;
-    font-weight: 600;
-    line-height: 1;
-    white-space: nowrap;
-  }
-
-  .mw-rank-badge .mw-rank-stats {
-    grid-column: 2 / 4;
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, auto));
-    gap: 8px 12px;
-    color: #605c55;
-    font-size: 12px;
-    font-weight: 500;
-    line-height: 1.2;
-  }
-
-  .mw-rank-badge .mw-rank-stats strong {
-    color: #202020;
-    font-weight: 700;
-  }
-
-  .mw-rank-badge.mw-rank-loading {
-    border-color: #d9d5cc;
-    box-shadow: none;
-  }
-
-  .mw-rank-badge.mw-rank-loading .mw-rank-accent {
-    background: #c7c1b8;
-  }
-
-  .mw-rank-badge .mw-rank-loading-text {
-    color: #55504a;
-    font-size: 15px;
-    font-weight: 600;
-    line-height: 1.2;
-  }
-
-  /* Bloc général sous l'année 2025-2026 */
-  .mw-general-rank-panel {
-    width: 100%;
-    margin: 0;
-    padding: 16px;
-    box-sizing: border-box;
-    background: #fff;
-    border: 1px solid #dedbd5;
-    border-radius: 12px;
-    box-shadow: 0 14px 34px rgba(23, 23, 23, 0.08);
-  }
-
-  .mw-general-rank-panel-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 14px;
-    padding-left: 10px;
-    border-left: 4px solid #9a1f28;
-  }
-
-  .mw-general-rank-panel-title {
-    color: #202020;
-    font-size: 15px;
-    font-weight: 700;
-    line-height: 1.2;
-  }
-
-  .mw-general-rank-panel-subtitle {
-    margin-top: 3px;
-    color: #77736c;
-    font-size: 12px;
-    font-weight: 500;
-    line-height: 1.2;
-  }
-
-  .mw-general-rank-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 10px;
-  }
-
-  .mw-general-rank-card {
-    min-width: 0;
-    padding: 13px 12px;
-    background: #fbfaf8;
-    border: 1px solid #e4e0d8;
-    border-radius: 10px;
-  }
-
-  .mw-general-rank-card-title {
-    color: #73706a;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .mw-general-rank-mainline {
-    display: flex;
-    align-items: baseline;
-    gap: 4px;
-    margin-top: 8px;
-  }
-
-  .mw-general-rank-rank {
-    color: #202020;
-    font-size: 24px;
-    font-weight: 800;
-    line-height: 1;
-  }
-
-  .mw-general-rank-total {
-    color: #858079;
-    font-size: 15px;
-    font-weight: 600;
-  }
-
-  .mw-general-rank-details {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    margin-top: 9px;
-    color: #605c55;
-    font-size: 12px;
-    line-height: 1.2;
-  }
-
-  .mw-general-rank-details strong {
-    color: #202020;
-    font-weight: 700;
-  }
-
-  @media (max-width: 520px) {
-    .mw-rank-badge {
-      grid-template-columns: auto minmax(0, 1fr);
-      gap: 12px;
-      padding: 13px 14px;
-    }
-
-    .mw-rank-badge .mw-rank-percentile {
-      grid-column: 2;
-      justify-self: start;
-      margin-top: 2px;
-    }
-
-    .mw-rank-badge .mw-rank-stats {
-      grid-column: 1 / -1;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .mw-general-rank-panel {
-      width: 100%;
-      padding: 14px;
-    }
-
-    .mw-general-rank-grid {
-      grid-template-columns: 1fr;
-    }
-  }
-`;
-
-function appendStyleElement(styleElement) {
-    const target = document.head || document.documentElement;
-
-    if (target) {
-        target.appendChild(styleElement);
-        return;
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-        document.head?.appendChild(styleElement);
-    }, { once: true });
-}
-
-appendStyleElement(style);
-
-
 // ——————————————————————————————————————————
 // Initialisation
 // ——————————————————————————————————————————
 
-if (typeof chrome !== 'undefined' && chrome.runtime?.id) {
-    prefetchGeneralRankData();
-}
+// On ne fait PLUS de requêtes réseau agressives (prefetch) au lancement du script.
+// Le navigateur a besoin de sa bande passante pour charger le site d'abord !
+// L'injection se lancera automatiquement quand le DOM sera prêt via le MutationObserver.
 
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
-        scheduleGeneralInjection();
+        scheduleGeneralInjection(1000);
     });
 } else {
-    scheduleGeneralInjection();
+    scheduleGeneralInjection(1000);
 }
 
 console.log('[MyWay Rank] Extension chargée ✓');

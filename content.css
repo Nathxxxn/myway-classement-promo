@@ -1,0 +1,229 @@
+/* Badge de classement dans la modal */
+.mw-rank-badge {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  box-sizing: border-box;
+  width: 100%;
+  background: #fff;
+  border: 1px solid #1f2326;
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin: 12px 0 14px;
+  box-shadow: 0 14px 34px rgba(23, 23, 23, 0.10);
+  font-size: 14px;
+  color: #202020;
+}
+
+.mw-rank-badge .mw-rank-accent {
+  width: 4px;
+  height: 42px;
+  border-radius: 999px;
+  background: #9a1f28;
+}
+
+.mw-rank-badge .mw-rank-main {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.mw-rank-badge .mw-rank-label {
+  color: #73706a;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.mw-rank-badge .mw-rank-line {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
+}
+
+.mw-rank-badge .mw-rank-value {
+  color: #202020;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.mw-rank-badge .mw-rank-total {
+  color: #858079;
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1.1;
+}
+
+.mw-rank-badge .mw-rank-percentile {
+  justify-self: end;
+  color: #9a1f28;
+  background: #fff;
+  border: 1px solid #d9d5cc;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.mw-rank-badge .mw-rank-stats {
+  grid-column: 2 / 4;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, auto));
+  gap: 8px 12px;
+  color: #605c55;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.mw-rank-badge .mw-rank-stats strong {
+  color: #202020;
+  font-weight: 700;
+}
+
+.mw-rank-badge.mw-rank-loading {
+  border-color: #d9d5cc;
+  box-shadow: none;
+}
+
+.mw-rank-badge.mw-rank-loading .mw-rank-accent {
+  background: #c7c1b8;
+}
+
+.mw-rank-badge .mw-rank-loading-text {
+  color: #55504a;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+/* Bloc général sous l'année 2025-2026 */
+.mw-general-rank-panel {
+  width: 100%;
+  margin: 0;
+  padding: 16px;
+  box-sizing: border-box;
+  background: #fff;
+  border: 1px solid #dedbd5;
+  border-radius: 12px;
+  box-shadow: 0 14px 34px rgba(23, 23, 23, 0.08);
+}
+
+.mw-general-rank-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  padding-left: 10px;
+  border-left: 4px solid #9a1f28;
+}
+
+.mw-general-rank-panel-title {
+  color: #202020;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.mw-general-rank-panel-subtitle {
+  margin-top: 3px;
+  color: #77736c;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.mw-general-rank-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mw-general-rank-card {
+  min-width: 0;
+  padding: 13px 12px;
+  background: #fbfaf8;
+  border: 1px solid #e4e0d8;
+  border-radius: 10px;
+}
+
+.mw-general-rank-card-title {
+  color: #73706a;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mw-general-rank-mainline {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.mw-general-rank-rank {
+  color: #202020;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.mw-general-rank-total {
+  color: #858079;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.mw-general-rank-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 9px;
+  color: #605c55;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.mw-general-rank-details strong {
+  color: #202020;
+  font-weight: 700;
+}
+
+@media (max-width: 520px) {
+  .mw-rank-badge {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 12px;
+    padding: 13px 14px;
+  }
+
+  .mw-rank-badge .mw-rank-percentile {
+    grid-column: 2;
+    justify-self: start;
+    margin-top: 2px;
+  }
+
+  .mw-rank-badge .mw-rank-stats {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mw-general-rank-panel {
+    width: 100%;
+    padding: 14px;
+  }
+
+  .mw-general-rank-grid {
+    grid-template-columns: 1fr;
+  }
+}
